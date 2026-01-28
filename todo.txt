@@ -1,0 +1,7 @@
+x 2026-01-28 Переместить инициализацию категории в app init @homework +task-service
+x 2026-01-28 Переместить сообщение о запуске и установку a.started в goroutine @homework +task-service
+(B) Объяснить зачем нужен terminated в App
+(C) Почитать https://cast.ai/blog/kubernetes-cordon-how-it-works-and-when-to-use-it. @learn +task-service
+(C) реализовать /cardon @homework +task-service
+(C) реализовать /uncordon @homework +task-service
+(D) Проверить оставленные в проекте TODO @learn +task-service

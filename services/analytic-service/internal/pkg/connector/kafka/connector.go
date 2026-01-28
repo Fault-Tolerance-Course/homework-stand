@@ -17,6 +17,7 @@ func MustConsumerGroup() sarama.ConsumerGroup {
 
 	group, err := sarama.NewConsumerGroup(config.Instance().Kafka.Brokers, config.Instance().Kafka.ConsumerGroup, cfg)
 	if err != nil {
+		// TODO: Некорректное использование метода, лучше Fatal
 		log.Fatalf(err.Error())
 		return nil
 	}
@@ -32,6 +33,7 @@ func MustSyncProducer() sarama.SyncProducer {
 
 	producer, err := sarama.NewSyncProducer(config.Instance().Kafka.Brokers, saramaConfig)
 	if err != nil {
+		// TODO: Некорректное использование метода, лучше Fatal
 		log.Fatalf(err.Error())
 		return nil
 	}

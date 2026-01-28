@@ -30,7 +30,7 @@ func (s *Storage) IsLoaded() bool {
 }
 
 func (s *Storage) LoadCategories(_ context.Context, filePath string) error {
-	// имитация тяжелой загрузки
+	// НЕ ТРОГАТЬ! имитация тяжелой загрузки
 	time.Sleep(30 * time.Second)
 
 	// Читаем и парсим файл

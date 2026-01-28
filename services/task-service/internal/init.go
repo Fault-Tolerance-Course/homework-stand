@@ -176,6 +176,7 @@ func (a *App) initHealthCheck(_ context.Context) error {
 	a.adminMux.Post("/cordon", func(writer http.ResponseWriter, request *http.Request) {
 		// TODO: как я могу вывести мой под из балансировки тут? Что делать?
 	})
+
 	a.adminMux.Post("/uncordon", func(writer http.ResponseWriter, request *http.Request) {
 		// TODO: как я могу ввести мой под в балансировку тут? Что делать?
 	})
@@ -217,5 +218,14 @@ func (a *App) initGrpcConn(_ context.Context) error {
 		a.grpcConn[srv] = conn
 		closer.Add(conn.Close)
 	}
+	return nil
+}
+
+func (a *App) initCategory(ctx context.Context) error {
+	err := a.storages.Category.LoadCategories(ctx, config.Instance().Categories.FilePath)
+	if err != nil {
+		slog.Error(fmt.Sprintf("error while loading categories: %s", err.Error()))
+	}
+
 	return nil
 }

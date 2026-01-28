@@ -13,7 +13,7 @@ http_server:
   port: 8082
 
 kafka:
-  brokers: [ "kafka:9092" ]
+  brokers: ["kafka:9092"]
 
 postgres:
   host: task-postgres
@@ -27,4 +27,5 @@ postgres:
   max_con_lifetime: 5s
 
 categories:
+  # TODO: почиать про /etc/ и понять почему именно в него сохраняется json
   file_path: "/etc/task-service/categories.json"
