@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"runtime"
 	"sync/atomic"
-
+	
 	"task-service/config"
 	v1 "task-service/internal/app/task/v1"
 	service "task-service/internal/application/service/task"
@@ -20,14 +20,14 @@ import (
 	"task-service/internal/pkg/grpc/intercept"
 	"task-service/internal/pkg/healthcheck"
 	taskV1 "task-service/internal/pkg/pb/task-service/task/v1"
-
+	
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"google.golang.org/grpc/credentials/insecure"
-
+	
 	"github.com/not-for-prod/clay/server"
 	"github.com/not-for-prod/clay/transport"
-
+	
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 )
@@ -36,7 +36,7 @@ func (a *App) initControllers(_ context.Context) error {
 	a.controllers = []transport.ServiceDesc{
 		taskV1.NewTaskServiceServiceDesc(v1.NewTaskService(a.services)),
 	}
-
+	
 	return nil
 }
 
@@ -45,7 +45,7 @@ func (a *App) initPostgres(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("[POSTGRES] Не удалось инициализировать pool: %s", err.Error())
 	}
-
+	
 	a.pool = pool
 	return nil
 }
@@ -61,10 +61,7 @@ func (a *App) initStorages(ctx context.Context) error {
 	if a.storages == nil {
 		a.storages = storage.NewRegistry(a.pool)
 	}
-
-	// TODO: тут я хочу убедиться,что данные по категориям успешно инициализированы.
-	//  После этого приложение может стартовать
-	// Но какому типу пробы подходит эта задача?
+	
 	return nil
 }
 
@@ -88,27 +85,27 @@ func (a *App) initAdminServer(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to init admin listener: %w", err)
 	}
-
+	
 	a.adminListener = lis
 	a.adminMux = chi.NewMux()
-
-	// init healthcheck for admin server
+	
+	// init health check for admin server
 	if err = a.initHealthCheck(ctx); err != nil {
 		return fmt.Errorf("failed to init healthcheck: %w", err)
 	}
-
+	
 	a.adminMux.Mount("/debug", chimw.Profiler())
-
+	
 	// register healthcheck
 	a.adminMux.HandleFunc(healthcheck.LivenessPath, a.healthCheck.LiveEndpoint)
 	a.adminMux.HandleFunc(healthcheck.ReadinessPath, a.healthCheck.ReadyEndpoint)
-
+	
 	return nil
 }
 
 func (a *App) initMainServer(ctx context.Context) error {
 	a.mainMux = chi.NewMux()
-
+	
 	// init server (htt,grpc)
 	a.mainServer = server.NewServer(
 		config.Instance().GrpcServer.Port,
@@ -126,11 +123,11 @@ func (a *App) initMainServer(ctx context.Context) error {
 			),
 		),
 	)
-
+	
 	a.publicCloser.Add(func() error {
 		gracefulCtx, cancel := context.WithTimeout(context.Background(), config.Instance().Graceful.Timeout)
 		defer cancel()
-
+		
 		done := make(chan struct{})
 		go func() {
 			err := a.mainServer.Stop(gracefulCtx)
@@ -139,7 +136,7 @@ func (a *App) initMainServer(ctx context.Context) error {
 			}
 			close(done)
 		}()
-
+		
 		select {
 		case <-done:
 			slog.Warn("task-service: main server gracefully stopped")
@@ -150,13 +147,13 @@ func (a *App) initMainServer(ctx context.Context) error {
 		}
 		return nil
 	})
-
+	
 	return nil
 }
 
 func (a *App) initHealthCheck(_ context.Context) error {
 	a.healthCheck = healthcheck.NewHandler()
-
+	
 	// поверяю, что нет утечки горутин на старте (как пример)
 	a.healthCheck.AddLivenessCheck("goroutines", func() error {
 		if runtime.NumGoroutine() < 1000 {
@@ -164,35 +161,28 @@ func (a *App) initHealthCheck(_ context.Context) error {
 		}
 		return fmt.Errorf("application has too much running goroutines")
 	})
-
+	
 	// readiness - т.к. я уже проинициализировал все компоненты
 	a.healthCheck.AddReadinessCheck("started", func() error {
 		if atomic.LoadInt32(&a.started) != 0 {
 			return nil
 		}
-		return fmt.Errorf("application is not statred yet")
+		return fmt.Errorf("application is not started yet")
 	})
-
-	a.adminMux.Post("/cordon", func(writer http.ResponseWriter, request *http.Request) {
-		// TODO: как я могу вывести мой под из балансировки тут? Что делать?
-	})
-	a.adminMux.Post("/uncordon", func(writer http.ResponseWriter, request *http.Request) {
-		// TODO: как я могу ввести мой под в балансировку тут? Что делать?
-	})
-
+	
 	a.healthCheck.AddReadinessCheck("termination", func() error {
 		if atomic.LoadInt32(&a.terminated) == 0 {
 			return nil
 		}
 		return fmt.Errorf("application is terminating now")
 	})
-
+	
 	// Почему мне нужен этот флажок?
 	// И зачем я его выставляю по завершению работы приложения?
 	a.publicCloser.Add(func() error {
 		slog.Warn(fmt.Sprintf("app got termination signal, graceful config timeout: %s",
 			config.Instance().Graceful.Timeout.String()))
-
+		
 		atomic.StoreInt32(&a.terminated, 1)
 		return nil
 	})
@@ -202,20 +192,58 @@ func (a *App) initHealthCheck(_ context.Context) error {
 func (a *App) initGrpcConn(_ context.Context) error {
 	for _, srv := range []string{config.ProfileService} {
 		var err error
-
+		
 		conn, err := grpc.NewClient(config.Instance().Targets[srv],
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
 			grpc.WithChainUnaryInterceptor(
 				intercept.SetClientNameInterceptor(config.AppName),
 			),
 		)
-
+		
 		if err != nil {
 			return fmt.Errorf("не удалось инициализировать grpc соединение к %s : %s", srv, err.Error())
 		}
-
+		
 		a.grpcConn[srv] = conn
 		closer.Add(conn.Close)
 	}
+	return nil
+}
+
+func (a *App) initCategories(ctx context.Context) error {
+	go func() {
+		err := a.storages.Category.LoadCategories(ctx, config.Instance().Categories.FilePath)
+		if err != nil {
+			slog.Error(fmt.Sprintf("error while loading categories: %s", err.Error()))
+		}
+	}()
+	
+	a.healthCheck.AddReadinessCheck("categories", func() error {
+		if a.storages.Category.IsLoaded() == true {
+			return nil
+		}
+		return fmt.Errorf("categories are not loaded")
+	})
+	
+	return nil
+}
+
+func (a *App) initCordonActions(_ context.Context) error {
+	a.adminMux.Post("/cordon", func(writer http.ResponseWriter, request *http.Request) {
+		atomic.StoreInt32(&a.cordon, 1)
+		writer.WriteHeader(http.StatusOK)
+	})
+	a.adminMux.Post("/uncordon", func(writer http.ResponseWriter, request *http.Request) {
+		atomic.StoreInt32(&a.cordon, 0)
+		writer.WriteHeader(http.StatusOK)
+	})
+	
+	a.healthCheck.AddReadinessCheck("cordon", func() error {
+		cordon := atomic.LoadInt32(&a.cordon)
+		if cordon == 0 {
+			return nil
+		}
+		return fmt.Errorf("application is temporarily out of traffic")
+	})
 	return nil
 }

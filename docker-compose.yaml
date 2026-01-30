@@ -3,7 +3,7 @@ services:
   #             APPLICATION                 #
   ###########################################
 
-  # profile service
+  # api gateway
   api-gateway:
     build:
       context: ./services/api-gateway
@@ -17,6 +17,7 @@ services:
     ports:
       - "7001:7002"
       - "8081:8080"
+      - "9000:8081"
     stop_grace_period: 10s
     depends_on:
       task-service:

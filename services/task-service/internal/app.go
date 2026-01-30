@@ -52,8 +52,15 @@ type App struct {
 
 	services *service.Registry
 
-	started    int32
+	started int32
+
+	// terminated signals that the application has started graceful shutdown.
+	// In this state the app skips incoming traffic (not ready) and
+	// on the next liveness check transitions to unhealthy.
 	terminated int32
+
+	// Refer to README for more info about cordon/uncordon mechanism
+	cordon int32
 
 	// обработчик health check probe
 	healthCheck healthcheck.Handler
@@ -79,14 +86,6 @@ func New(ctx context.Context) *App {
 	if err != nil {
 		log.Fatalf("[APP] Не удалось инициализировать приложение: %s", err.Error())
 	}
-
-	// Петя решил тут подгрузить файл
-	go func() {
-		err = app.storages.Category.LoadCategories(ctx, config.Instance().Categories.FilePath)
-		if err != nil {
-			slog.Error(fmt.Sprintf("error while loading categories: %s", err.Error()))
-		}
-	}()
 
 	return app
 }
@@ -147,6 +146,8 @@ func (a *App) init(ctx context.Context) error {
 		a.initServices,
 		a.initMainServer,
 		a.initControllers,
+		a.initCategories,
+		a.initCordonActions,
 	}
 
 	for _, f := range initFuncs {
