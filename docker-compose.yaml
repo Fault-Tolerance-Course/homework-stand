@@ -90,7 +90,7 @@ services:
     depends_on:
       profile-service:
         condition: service_started
-      kafka:
+      kafka-1:
         condition: service_healthy
         restart: true
       task-service-migrations:
@@ -125,7 +125,7 @@ services:
       - "8084:8080"
     stop_grace_period: 10s
     depends_on:
-      kafka:
+      kafka-1:
         condition: service_healthy
         restart: true
       analytic-service-migrations:
@@ -380,9 +380,9 @@ services:
   #             BROKERS                     #
   ###########################################
 
-  akhq:
+  akhq-1:
     image: tchiotludo/akhq:dev
-    container_name: akhq
+    container_name: akhq-1
     environment:
       AKHQ_CONFIGURATION: |
         akhq:
@@ -393,19 +393,19 @@ services:
     ports:
       - "8090:8080"
     links:
-      - kafka
+      - kafka-1
     networks:
       - app-network
 
-  kafka:
+  kafka-1:
     image: confluentinc/cp-kafka:7.5.0
-    container_name: kafka
+    container_name: kafka-1
     hostname: kafka
     ports:
       - "9092:9092"
       - "9093:9093"
     depends_on:
-      - zookeeper
+      - zookeeper-1
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
@@ -422,16 +422,20 @@ services:
       timeout: 2s
       retries: 5
     networks:
-      - app-network
+      app-network:
+        aliases:
+          - kafka
 
-  zookeeper:
+  zookeeper-1:
     image: confluentinc/cp-zookeeper:latest
-    container_name: zookeeper
+    container_name: zookeeper-1
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
     networks:
-      - app-network
+      app-network:
+        aliases:
+          - zookeeper
 
 networks:
   app-network:
