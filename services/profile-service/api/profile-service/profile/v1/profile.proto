@@ -33,6 +33,7 @@ message GetProfileResponse {
   string email = 3;
 
   Tariff tariff = 4;
+  bool tariff_valid = 5;
 
   message Tariff {
     enum Enum{

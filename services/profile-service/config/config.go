@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"profile-service/internal/pkg/circuit"
 	"profile-service/internal/pkg/timeout"
 
 	"github.com/ilyakaznacheev/cleanenv"
@@ -27,9 +28,10 @@ type Config struct {
 	GrpcServer GrpcServer `yaml:"grpc_server"`
 	HttpServer HttpServer `yaml:"http_server"`
 
-	Postgres     Postgres     `yaml:"postgres"`
-	RedisCluster RedisCluster `yaml:"redis_cluster"`
-	Cache        Cache        `yaml:"cache"`
+	Postgres     Postgres       `yaml:"postgres"`
+	RedisCluster RedisCluster   `yaml:"redis_cluster"`
+	Cache        Cache          `yaml:"cache"`
+	Circuit      circuit.Config `yaml:"circuit"`
 
 	ExternalTimeouts timeout.ServiceClientSettings `yaml:"external_timeouts"`
 

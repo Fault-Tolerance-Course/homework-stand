@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"profile-service/internal/pkg/circuit/metrics"
 
 	"github.com/sony/gobreaker/v2"
 	"google.golang.org/grpc"
@@ -25,15 +26,20 @@ func (b *Breaker) UnaryClientInterceptor() grpc.UnaryClientInterceptor {
 		if err != nil {
 			// Если это ошибка circuit breaker, возвращаем ее
 			if errors.Is(err, gobreaker.ErrOpenState) {
+				metrics.IncRequestCountByState(state.breaker.Name(), metrics.OpenState)
 				return ErrCircuitIsOpen
 			}
 
 			if errors.Is(err, gobreaker.ErrTooManyRequests) {
+				metrics.IncRequestCountByState(state.breaker.Name(), metrics.TooManyRequests)
 				return ErrTooManyRequests
 			}
 
+			metrics.IncRequestCountByState(state.breaker.Name(), metrics.Other)
 			return err
 		}
+
+		metrics.IncRequestCountByState(state.breaker.Name(), metrics.NoError)
 		return nil
 	}
 }

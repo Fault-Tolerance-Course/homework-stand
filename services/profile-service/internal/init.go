@@ -14,6 +14,7 @@ import (
 	"profile-service/internal/infrastructure/adapter"
 	"profile-service/internal/infrastructure/gateway"
 	"profile-service/internal/infrastructure/storage"
+	"profile-service/internal/pkg/circuit"
 	"profile-service/internal/pkg/closer"
 	"profile-service/internal/pkg/connector/postgres"
 	"profile-service/internal/pkg/grpc/intercept"
@@ -218,6 +219,8 @@ func (a *App) initGrpcConn(_ context.Context) error {
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
 			grpc.WithChainUnaryInterceptor(
 				intercept.SetClientNameInterceptor(config.AppName),
+				circuit.NewCircuitBreaker(config.Instance().Circuit).UnaryClientInterceptor(),
+				timeout.NewClientTimeoutInterceptor(srv),
 			),
 		)
 
