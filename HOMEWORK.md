@@ -2,6 +2,22 @@
 
 ## Задание 1
 
+Делаем fallback на базовый тариф в случае ошибки. Чтобы разработчик узнал о проблеме мы пишем лог, так же можно писать метрику.
+
+Кроме этого, в ответ ручки добавлено новое поле TariffValid, сообщающая о том, удалось ли получить достоверный тариф из мастер-сервиса (не смог нормально перегенерить протники, поэтому не стал замарачиваться и в действительности прокидывать в респонс, но суть ясна)
+
+Также мы могли бы закэшировать тариф, в таком случае мы бы опирались на недавно достоверное значение, а не на фиксированное.
+
+Плюсы выбора фиксированного тарифа в качестве fallback:
+1. Простота
+2. Скорость
+3. Отсутствие каких-либо внешних зависимостей
+
+Минусы:
+1. Вероятная недостоверность и, как следствие, ухудшение пользовательского опыта (пользователь с лучшим тарифом будет недоволен получить базовый по ошибке сервиса)
+
+
+
 ## Задание 2
 
 ### ❓ Вопрос 1
@@ -89,3 +105,110 @@ Ri = interval * rate = 20s * 2(req / s) = 40 requests
 Полагая, что нагрузка распределена во времени равномерно, то в каждый бакет попадет
 
 Rb = bucket_period * rate = 20 requests
+
+
+
+## Задание 3
+
+Выбранный механизм - circuit breaker. Конфигурация:
+
+```yaml
+circuit:
+  handlers:
+    - method: "/analytic_service.order.v1.AnalyticService/GetUserTaskCount"
+      enabled: true
+      max_requests: 10
+      timeout: 5s
+      interval: 20s
+      bucket_period: 5s
+      threshold_consecutive: 5
+      threshold_percentage: 30
+```
+
+На самом деле, конфигурация взята по большей части "от фонаря", чтобы точнее все настроить, по хорошему надо знать характер нагрузки и основные метрики из прода.
+
+Данный механизм позволил перестать нагружать и так страдающий сервис аналитики.
+
+
+## Задание 4
+
+Для ручки установлен таймаут в 250 миллисекунд, чтобы уложиться в SLO <= 300ms
+
+```yaml
+external_timeouts:
+  default:
+    timeout: 5s
+  services:
+    analytic-service:
+      timeout: 5s
+      handlers:
+        /analytic_service.order.v1.AnalyticService/GetUserTaskCount:
+          timeout: 250ms # берем с запасом 50 ms на собственную логику, сеть и т. д.
+```
+
+При переключении в режим slow, сервис продолжает отвечать фолбеком из первого задания, справляясь менее, чем за 300ms:
+```
+2026/02/09 23:00:02 INFO [RESULT] user=2 took=3.880292ms result=user_id:2 name:"Alice" email:"alice@gmail.com" tariff:{tariff:BASE}
+2026/02/09 23:00:03 INFO [RESULT] user=3 took=15.814584ms result=user_id:3 name:"Bob" email:"bob@gmail.com" tariff:{tariff:BASE}
+2026/02/09 23:00:03 INFO [RESULT] user=1 took=3.111083ms result=user_id:1 name:"Nick" email:"nick@gmail.com" tariff:{tariff:BASE}
+2026/02/09 23:00:04 INFO [RESULT] user=2 took=15.497334ms result=user_id:2 name:"Alice" email:"alice@gmail.com" tariff:{tariff:BASE}
+// switch to slow mode
+2026/02/09 23:00:04 INFO [RESULT] user=3 took=207.408584ms result=user_id:3 name:"Bob" email:"bob@gmail.com" tariff:{tariff:BASE}
+2026/02/09 23:00:05 INFO [RESULT] user=1 took=208.841083ms result=user_id:1 name:"Nick" email:"nick@gmail.com" tariff:{tariff:BASE}
+2026/02/09 23:00:05 INFO [RESULT] user=2 took=255.264208ms result=user_id:2 name:"Alice" email:"alice@gmail.com" tariff:{tariff:BASE}
+2026/02/09 23:00:06 INFO [RESULT] user=3 took=255.540542ms result=user_id:3 name:"Bob" email:"bob@gmail.com" tariff:{tariff:BASE}
+2026/02/09 23:00:06 INFO [RESULT] user=1 took=253.969958ms result=user_id:1 name:"Nick" email:"nick@gmail.com" tariff:{tariff:BASE}
+2026/02/09 23:00:07 INFO [RESULT] user=2 took=254.925834ms result=user_id:2 name:"Alice" email:"alice@gmail.com" tariff:{tariff:BASE}
+2026/02/09 23:00:07 INFO [RESULT] user=3 took=257.307291ms result=user_id:3 name:"Bob" email:"bob@gmail.com" tariff:{tariff:BASE}
+// switch to ok
+2026/02/09 23:00:08 INFO [RESULT] user=1 took=3.82625ms result=user_id:1 name:"Nick" email:"nick@gmail.com" tariff:{tariff:BASE}
+2026/02/09 23:00:08 INFO [RESULT] user=2 took=6.462542ms result=user_id:2 name:"Alice" email:"alice@gmail.com" tariff:{tariff:BASE}
+2026/02/09 23:00:09 INFO [RESULT] user=3 took=6.862958ms result=user_id:3 name:"Bob" email:"bob@gmail.com" tariff:{tariff:BASE}
+2026/02/09 23:00:09 INFO [RESULT] user=1 took=3.537583ms result=user_id:1 name:"Nick" email:"nick@gmail.com" tariff:{tariff:BASE}
+```
+
+Ответ на вопрос из README.md:
+
+```
+Вопрос на засыпку:
+
+Предположим, что мы еще ничего тут не сделали. И видим в конфиге значение таймаута в 5s для сервиса analytic.
+
+В то же время таймаут на клиенте (генератор) выставлен в 3s, что явно меньше, чем таймаут из profile -> analytic.
+
+В случае достижения таймаута на стороне генератора (он ждал 3 сек и прекращает, отменяя контекст), какой код ошибки будет на стыке каждого участника цепи?
+
+После отмены контекста на стороне генератора:
+
+Какой код ошибке вернутся из долго выполняющего запросы сервиса analytic достанется сервису profile?
+А от profile генератору?
+А в коде генератора какой код будет получен?
+```
+
+**Какой код ошибке вернутся из долго выполняющего запросы сервиса analytic достанется сервису profile?**
+
+Canceled - поскольку наш внутренний таймаут (5 с) не был еще превышен, но генератор отменил контекст, поскольку его таймаут (3с) исчерпался.
+
+
+**А от profile генератору?**
+
+OK - отдадим fallback, несмотря на ошибку из сервиса аналитики.
+
+
+**А в коде генератора какой код будет получен?**
+
+Генератор получит DeadlineExceeded, т.к запрос не уложился в таймаут 3 секунды.
+
+
+**Стоит ли реагировать circuit breaker'у на код context.Canceled и почему?**
+
+Не стоит, потому что задача CB - защищать проблемный сервис от ненужной нагрузки, а отмена контекста - это не проблема мастер-сервиса, а отмена запроса клиентом.
+
+## Задание 5
+
+Я реализовал две метрики:
+
+1. circuit_requests_attempted_total - метрика типа Counter, подсчитывающая общее количество запросов, прошедших через CB с разделением на ошибки (nil, open_state, too_many_requests, other).
+2. circuit_state_transition_duration_seconds - метрика типа Histogram, подсчитывающая время перехода между состояниями CB в секундах. Тяжело подбирать бакеты, поскольку, как правило, переходы между состояниями делаются нечасто (кроме open -> half-open -> open), поэтому взял 15 ведер с множителем 2.
+
+Для реализации второй метрики пришлось добавить дополнительную горутину, которая читает канал, в который записывается событие при смене состояния CB. Эта горутина записывает метрику и сбрасывает счетчик.
