@@ -15,6 +15,12 @@ http_server:
 external_timeouts:
   default:
     timeout: 5s
+  services:
+    analytic-service:
+      timeout: 5s
+      handlers:
+        /analytic_service.order.v1.AnalyticService/GetUserTaskCount:
+          timeout: 250ms # берем с запасом 50 ms на собственную логику, сеть и т. д.
 
 postgres:
   host: profile-postgres
@@ -48,3 +54,13 @@ redis_cluster:
   read_timeout: 3s
   write_timeout: 3s
 
+circuit:
+  handlers:
+    - method: "/analytic_service.order.v1.AnalyticService/GetUserTaskCount"
+      enabled: true
+      max_requests: 10
+      timeout: 5s
+      interval: 20s
+      bucket_period: 5s
+      threshold_consecutive: 5
+      threshold_percentage: 30
