@@ -3,6 +3,10 @@ package circuit
 import (
 	"fmt"
 	"log/slog"
+	"runtime"
+	"time"
+
+	"profile-service/internal/pkg/circuit/metrics"
 
 	"github.com/samber/lo"
 	"github.com/sony/gobreaker/v2"
@@ -21,6 +25,20 @@ type internalState struct {
 }
 
 func newInternalState(config MainConfig, name string) *internalState {
+	type stateChangeEvent struct {
+		from, to gobreaker.State
+	}
+
+	stateChangedCh := make(chan stateChangeEvent, 1)
+
+	go func(stateChangedCh <-chan stateChangeEvent) {
+		timeSinceLastChange := time.Now()
+		for event := range stateChangedCh {
+			metrics.ObserveStateTransitionDuration(name, event.from, event.to, time.Now().Sub(timeSinceLastChange).Seconds())
+			timeSinceLastChange = time.Now()
+		}
+	}(stateChangedCh)
+
 	settings := gobreaker.Settings{
 		Name:         name,
 		MaxRequests:  config.MaxRequests,
@@ -65,16 +83,23 @@ func newInternalState(config MainConfig, name string) *internalState {
 		},
 		OnStateChange: func(name string, from, to gobreaker.State) {
 			slog.Info(fmt.Sprintf("circuit breaker '%s' changed state: %s → %s", name, from, to))
+			stateChangedCh <- stateChangeEvent{from: from, to: to}
 		},
 		IsSuccessful: func(err error) bool {
 			return !triggerOnError(err, config.FailureCodes, config.failureCodeSet())
 		},
 	}
 
-	return &internalState{
+	state := &internalState{
 		breaker: gobreaker.NewCircuitBreaker[any](settings),
 		cfg:     config,
 	}
+
+	runtime.AddCleanup(state, func(ch chan stateChangeEvent) {
+		close(ch)
+	}, stateChangedCh)
+
+	return state
 }
 
 func (s cbStateByHandlers) get(method string) (_ *internalState, enabled bool) {
