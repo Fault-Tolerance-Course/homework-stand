@@ -89,6 +89,10 @@ func (a *App) initAdminServer(ctx context.Context) error {
 		return fmt.Errorf("failed to init admin listener: %w", err)
 	}
 
+	slog.Info(fmt.Sprintf("ADMIN STARTED ON PORTS => HTTP: %s",
+		lis.Addr().String(),
+	))
+
 	a.adminListener = lis
 	a.adminMux = chi.NewMux()
 
@@ -174,10 +178,11 @@ func (a *App) initHealthCheck(_ context.Context) error {
 	})
 
 	a.adminMux.Post("/cordon", func(writer http.ResponseWriter, request *http.Request) {
-		// TODO: как я могу вывести мой под из балансировки тут? Что делать?
+		atomic.StoreInt32(&a.terminated, 1)
 	})
+
 	a.adminMux.Post("/uncordon", func(writer http.ResponseWriter, request *http.Request) {
-		// TODO: как я могу ввести мой под в балансировку тут? Что делать?
+		atomic.StoreInt32(&a.terminated, 0)
 	})
 
 	a.healthCheck.AddReadinessCheck("termination", func() error {
@@ -217,5 +222,14 @@ func (a *App) initGrpcConn(_ context.Context) error {
 		a.grpcConn[srv] = conn
 		closer.Add(conn.Close)
 	}
+	return nil
+}
+
+func (a *App) initCategory(ctx context.Context) error {
+	err := a.storages.Category.LoadCategories(ctx, config.Instance().Categories.FilePath)
+	if err != nil {
+		slog.Error(fmt.Sprintf("error while loading categories: %s", err.Error()))
+	}
+
 	return nil
 }

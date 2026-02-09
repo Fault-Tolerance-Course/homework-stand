@@ -80,19 +80,12 @@ func New(ctx context.Context) *App {
 		log.Fatalf("[APP] Не удалось инициализировать приложение: %s", err.Error())
 	}
 
-	// Петя решил тут подгрузить файл
-	go func() {
-		err = app.storages.Category.LoadCategories(ctx, config.Instance().Categories.FilePath)
-		if err != nil {
-			slog.Error(fmt.Sprintf("error while loading categories: %s", err.Error()))
-		}
-	}()
-
 	return app
 }
 
 // Run запуск приложения
 func (a *App) Run(_ context.Context) {
+	// Сервис запускается в goroutine, и даже если сервис не запустился полностью, то флаг &a.started = 1 уже устанвлен
 	if a.mainServer != nil {
 		go func() {
 			if err := a.mainServer.Run(a.controllers...); err != nil {
@@ -102,13 +95,13 @@ func (a *App) Run(_ context.Context) {
 		}()
 	}
 
-	// start signal
-	atomic.StoreInt32(&a.started, 1)
-
 	slog.Info(fmt.Sprintf("APP STARTED ON PORTS => HTTP: %d, GRPC: %d",
 		config.Instance().GrpcServer.Port,
 		config.Instance().HttpServer.Port,
 	))
+
+	// start signal
+	atomic.StoreInt32(&a.started, 1)
 
 	a.publicCloser.Wait()
 
@@ -147,6 +140,7 @@ func (a *App) init(ctx context.Context) error {
 		a.initServices,
 		a.initMainServer,
 		a.initControllers,
+		a.initCategory,
 	}
 
 	for _, f := range initFuncs {

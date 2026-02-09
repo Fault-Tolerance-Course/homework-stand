@@ -1,5 +1,5 @@
 up-all:
-	docker-compose up --remove-orphans
+	docker-compose up --remove-orphans --force-recreate
 
 down-all:
 	docker-compose down -v

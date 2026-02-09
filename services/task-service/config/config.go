@@ -19,6 +19,8 @@ const (
 )
 
 var (
+	// TODO: уточникть что за паттерн, скорее всего single tone
+	// TODO: проверить можно ли менять значения в любом месте программы, думаю что можно
 	instance *Config
 	once     sync.Once
 )
@@ -50,6 +52,7 @@ func Instance() *Config {
 
 		instance.Targets = make(map[string]string)
 
+		// Получение имя сервиса/приложения
 		for _, env := range os.Environ() {
 			if !strings.Contains(env, "_SERVICE_ADDR") {
 				continue
@@ -60,6 +63,8 @@ func Instance() *Config {
 				continue
 			}
 
+			// TODO: почему имя просто не установить в конфиге?
+			// Как имя по попадает в ENV?
 			serviceName := strings.ToLower(strings.Split(parts[1], ":")[0])
 			instance.Targets[serviceName] = parts[1]
 		}
