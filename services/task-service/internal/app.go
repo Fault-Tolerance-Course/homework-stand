@@ -92,17 +92,16 @@ func (a *App) Run(_ context.Context) {
 				slog.Error(fmt.Sprintf("main server: %s", err.Error()))
 				a.publicCloser.CloseAll()
 			}
-
-			// start signal
-			atomic.StoreInt32(&a.started, 1)
-
-			slog.Info(fmt.Sprintf("APP STARTED ON PORTS => HTTP: %d, GRPC: %d",
-				config.Instance().GrpcServer.Port,
-				config.Instance().HttpServer.Port,
-			))
-
 		}()
 	}
+
+	slog.Info(fmt.Sprintf("APP STARTED ON PORTS => HTTP: %d, GRPC: %d",
+		config.Instance().GrpcServer.Port,
+		config.Instance().HttpServer.Port,
+	))
+
+	// start signal
+	atomic.StoreInt32(&a.started, 1)
 
 	a.publicCloser.Wait()
 
