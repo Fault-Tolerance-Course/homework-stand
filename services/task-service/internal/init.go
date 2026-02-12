@@ -65,6 +65,15 @@ func (a *App) initStorages(ctx context.Context) error {
 	// TODO: тут я хочу убедиться,что данные по категориям успешно инициализированы.
 	//  После этого приложение может стартовать
 	// Но какому типу пробы подходит эта задача?
+	go func() {
+		err := a.storages.Category.LoadCategories(ctx, config.Instance().Categories.FilePath)
+		if err != nil {
+			slog.Error(fmt.Sprintf("error while loading categories: %s", err.Error()))
+			return
+		}
+		atomic.StoreInt32(&a.categoriesLoaded, 1)
+	}()
+
 	return nil
 }
 
@@ -171,6 +180,14 @@ func (a *App) initHealthCheck(_ context.Context) error {
 			return nil
 		}
 		return fmt.Errorf("application is not statred yet")
+	})
+
+	// readiness - категории загружены
+	a.healthCheck.AddReadinessCheck("categoriesLoaded", func() error {
+		if atomic.LoadInt32(&a.categoriesLoaded) != 0 {
+			return nil
+		}
+		return fmt.Errorf("categories are not yet loaded")
 	})
 
 	a.adminMux.Post("/cordon", func(writer http.ResponseWriter, request *http.Request) {
