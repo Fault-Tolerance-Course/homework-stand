@@ -65,6 +65,15 @@ func (a *App) initStorages(ctx context.Context) error {
 	// TODO: тут я хочу убедиться,что данные по категориям успешно инициализированы.
 	//  После этого приложение может стартовать
 	// Но какому типу пробы подходит эта задача?
+	go func() {
+		err := a.storages.Category.LoadCategories(ctx, config.Instance().Categories.FilePath)
+		if err != nil {
+			slog.Error(fmt.Sprintf("error while loading categories: %s", err.Error()))
+			return
+		}
+		atomic.StoreInt32(&a.categoriesLoaded, 1)
+	}()
+
 	return nil
 }
 
@@ -102,6 +111,16 @@ func (a *App) initAdminServer(ctx context.Context) error {
 	// register healthcheck
 	a.adminMux.HandleFunc(healthcheck.LivenessPath, a.healthCheck.LiveEndpoint)
 	a.adminMux.HandleFunc(healthcheck.ReadinessPath, a.healthCheck.ReadyEndpoint)
+
+	// register cordon
+	a.adminMux.Post("/cordon", func(writer http.ResponseWriter, request *http.Request) {
+		atomic.StoreInt32(&a.cordon, 1)
+		writer.Write([]byte("cordon is set"))
+	})
+	a.adminMux.Post("/uncordon", func(writer http.ResponseWriter, request *http.Request) {
+		atomic.StoreInt32(&a.cordon, 0)
+		writer.Write([]byte("cordon is unset"))
+	})
 
 	return nil
 }
@@ -173,11 +192,20 @@ func (a *App) initHealthCheck(_ context.Context) error {
 		return fmt.Errorf("application is not statred yet")
 	})
 
-	a.adminMux.Post("/cordon", func(writer http.ResponseWriter, request *http.Request) {
-		// TODO: как я могу вывести мой под из балансировки тут? Что делать?
+	// readiness - категории загружены
+	a.healthCheck.AddReadinessCheck("categoriesLoaded", func() error {
+		if atomic.LoadInt32(&a.categoriesLoaded) != 0 {
+			return nil
+		}
+		return fmt.Errorf("categories are not yet loaded")
 	})
-	a.adminMux.Post("/uncordon", func(writer http.ResponseWriter, request *http.Request) {
-		// TODO: как я могу ввести мой под в балансировку тут? Что делать?
+
+	// readiness - pod is active (no cordon)
+	a.healthCheck.AddReadinessCheck("noTermination", func() error {
+		if atomic.LoadInt32(&a.cordon) == 0 {
+			return nil
+		}
+		return fmt.Errorf("cordon is set")
 	})
 
 	a.healthCheck.AddReadinessCheck("termination", func() error {
