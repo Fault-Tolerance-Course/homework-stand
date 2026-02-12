@@ -112,6 +112,16 @@ func (a *App) initAdminServer(ctx context.Context) error {
 	a.adminMux.HandleFunc(healthcheck.LivenessPath, a.healthCheck.LiveEndpoint)
 	a.adminMux.HandleFunc(healthcheck.ReadinessPath, a.healthCheck.ReadyEndpoint)
 
+	// register cordon
+	a.adminMux.Post("/cordon", func(writer http.ResponseWriter, request *http.Request) {
+		atomic.StoreInt32(&a.cordon, 1)
+		writer.Write([]byte("cordon is set"))
+	})
+	a.adminMux.Post("/uncordon", func(writer http.ResponseWriter, request *http.Request) {
+		atomic.StoreInt32(&a.cordon, 0)
+		writer.Write([]byte("cordon is unset"))
+	})
+
 	return nil
 }
 
@@ -190,11 +200,12 @@ func (a *App) initHealthCheck(_ context.Context) error {
 		return fmt.Errorf("categories are not yet loaded")
 	})
 
-	a.adminMux.Post("/cordon", func(writer http.ResponseWriter, request *http.Request) {
-		// TODO: как я могу вывести мой под из балансировки тут? Что делать?
-	})
-	a.adminMux.Post("/uncordon", func(writer http.ResponseWriter, request *http.Request) {
-		// TODO: как я могу ввести мой под в балансировку тут? Что делать?
+	// readiness - pod is active (no cordon)
+	a.healthCheck.AddReadinessCheck("noTermination", func() error {
+		if atomic.LoadInt32(&a.cordon) == 0 {
+			return nil
+		}
+		return fmt.Errorf("cordon is set")
 	})
 
 	a.healthCheck.AddReadinessCheck("termination", func() error {

@@ -55,6 +55,7 @@ type App struct {
 	started          int32
 	terminated       int32
 	categoriesLoaded int32
+	cordon           int32
 
 	// обработчик health check probe
 	healthCheck healthcheck.Handler
