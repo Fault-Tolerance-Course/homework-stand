@@ -111,6 +111,7 @@ func (a *App) Run(_ context.Context) {
 	))
 
 	a.publicCloser.Wait()
+	atomic.StoreInt32(&a.terminated, 1)
 
 	closer.CloseAll()
 }
