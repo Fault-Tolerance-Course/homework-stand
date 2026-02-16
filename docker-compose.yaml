@@ -25,10 +25,12 @@ services:
         condition: service_started
     healthcheck:
       test: [ "CMD-SHELL", "/etc/healthcheck.sh" ]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
+      interval: 5s
+      timeout: 4s
+      retries: 10
+      start_period: 10s
+    labels:
+      - autoheal=true
     volumes:
       - ./deploy/scripts/probes.sh:/etc/healthcheck.sh:ro
     networks:
@@ -48,7 +50,6 @@ services:
       - "7002:7002"
       - "8082:8080"
     stop_grace_period: 10s
-    command: ["sleep", "20s"]
     depends_on:
       analytic-service:
         condition: service_started
@@ -59,10 +60,13 @@ services:
         restart: true
     healthcheck:
       test: [ "CMD-SHELL", "/etc/healthcheck.sh" ]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
+      interval: 5s
+      timeout: 4s
+      retries: 10
+      start_period: 10s
+    restart: on-failure:3
+    labels:
+      - autoheal=true
     volumes:
       - ./deploy/scripts/probes.sh:/etc/healthcheck.sh:ro
     networks:
@@ -81,6 +85,7 @@ services:
     ports:
       - "7003:7002"
       - "8083:8080"
+      - "8091:8081"
     stop_grace_period: 10s
     depends_on:
       profile-service:
@@ -93,10 +98,13 @@ services:
         restart: true
     healthcheck:
       test: [ "CMD-SHELL", "/etc/healthcheck.sh" ]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
+      interval: 5s
+      timeout: 4s
+      retries: 5
+      start_period: 10s
+    restart: on-failure
+    labels:
+      - autoheal=true
     volumes:
       - ./services/task-service/categories.json:/etc/task-service/categories.json:ro
       - ./deploy/scripts/probes.sh:/etc/healthcheck.sh:ro
@@ -125,10 +133,12 @@ services:
         restart: true
     healthcheck:
       test: [ "CMD-SHELL", "/etc/healthcheck.sh" ]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
+      interval: 5s
+      timeout: 4s
+      retries: 10
+      start_period: 10s
+    labels:
+      - autoheal=true
     volumes:
       - ./deploy/scripts/probes.sh:/etc/healthcheck.sh:ro
     networks:
@@ -290,10 +300,10 @@ services:
     image: redis:7.4.2-alpine
     ports:
       - 6999:6999
-    command: sh -c "sleep 10 && redis-cli -p 7000 --cluster create \
+    command: sh -c "sleep 10 && redis-cli  --cluster create \
       profile-redis-oss-1:6000 profile-redis-oss-2:6001 profile-redis-oss-3:6002 \
       profile-redis-oss-4:6003 profile-redis-oss-5:6004 profile-redis-oss-6:6005 \
-      --cluster-replicas 1 --cluster-yes"
+      --cluster-replicas 1 --cluster-yes && sleep 10"
     depends_on:
      - profile-redis-oss-1
      - profile-redis-oss-2
@@ -388,7 +398,7 @@ services:
       - app-network
 
   kafka:
-    image: confluentinc/cp-kafka:latest
+    image: confluentinc/cp-kafka:7.5.0
     container_name: kafka
     hostname: kafka
     ports:

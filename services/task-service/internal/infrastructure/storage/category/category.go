@@ -20,7 +20,7 @@ type Storage struct {
 }
 
 func NewStorage() *Storage {
-	return &Storage{}
+	return &Storage{categories: map[string]dao.Category{}}
 }
 
 func (s *Storage) IsLoaded() bool {
