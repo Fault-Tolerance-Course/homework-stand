@@ -62,6 +62,13 @@ func (a *App) initStorages(ctx context.Context) error {
 		a.storages = storage.NewRegistry(a.pool)
 	}
 
+	go func() {
+		err := a.storages.Category.LoadCategories(ctx, config.Instance().Categories.FilePath)
+		if err != nil {
+			slog.Error(fmt.Sprintf("error while loading categories: %s", err.Error()))
+		}
+	}()
+
 	// TODO: тут я хочу убедиться,что данные по категориям успешно инициализированы.
 	//  После этого приложение может стартовать
 	// Но какому типу пробы подходит эта задача?
@@ -173,11 +180,20 @@ func (a *App) initHealthCheck(_ context.Context) error {
 		return fmt.Errorf("application is not statred yet")
 	})
 
+	a.healthCheck.AddReadinessCheck("categories", func() error {
+		if a.storages.Category.IsLoaded() {
+			return nil
+		}
+		return fmt.Errorf("categories not loaded yet")
+	})
+
 	a.adminMux.Post("/cordon", func(writer http.ResponseWriter, request *http.Request) {
 		// TODO: как я могу вывести мой под из балансировки тут? Что делать?
+		atomic.StoreInt32(&a.terminated, 1)
 	})
 	a.adminMux.Post("/uncordon", func(writer http.ResponseWriter, request *http.Request) {
 		// TODO: как я могу ввести мой под в балансировку тут? Что делать?
+		atomic.StoreInt32(&a.terminated, 0)
 	})
 
 	a.healthCheck.AddReadinessCheck("termination", func() error {
