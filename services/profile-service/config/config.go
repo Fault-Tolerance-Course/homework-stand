@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 
+	"profile-service/internal/pkg/retry"
+
 	"github.com/ilyakaznacheev/cleanenv"
 )
 
@@ -28,6 +30,7 @@ type Config struct {
 	Postgres     Postgres     `yaml:"postgres"`
 	RedisCluster RedisCluster `yaml:"redis_cluster"`
 	Cache        Cache        `yaml:"cache"`
+	Retry        retry.Config `yaml:"retry"`
 
 	Graceful Graceful          `yaml:"graceful"`
 	Targets  map[string]string `yaml:"service"`

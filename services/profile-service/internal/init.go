@@ -20,6 +20,7 @@ import (
 	"profile-service/internal/pkg/grpc/intercept"
 	"profile-service/internal/pkg/healthcheck"
 	profileV1 "profile-service/internal/pkg/pb/profile-service/profile/v1"
+	"profile-service/internal/pkg/retry"
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
@@ -208,6 +209,7 @@ func (a *App) initHealthCheck(_ context.Context) error {
 }
 
 func (a *App) initGrpcConn(_ context.Context) error {
+	retryInstance := retry.NewRetry(config.Instance().Retry)
 	for _, srv := range []string{config.AnalyticService} {
 		var err error
 
@@ -215,6 +217,7 @@ func (a *App) initGrpcConn(_ context.Context) error {
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
 			grpc.WithChainUnaryInterceptor(
 				intercept.SetClientNameInterceptor(config.AppName),
+				retryInstance.UnaryClientInterceptor(),
 			),
 		)
 

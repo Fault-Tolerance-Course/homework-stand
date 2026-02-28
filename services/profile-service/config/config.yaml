@@ -44,3 +44,21 @@ redis_cluster:
   read_timeout: 3s
   write_timeout: 3s
 
+retry:
+  handlers:
+    - method: "/analytic_service.order.v1.AnalyticService/GetUserTaskCount"
+      enabled: true
+      max_attempts: 2
+      initial_backoff: 50ms
+      max_backoff: 200ms
+      backoff_multiplier: 2
+      throttler:
+        throttling_enabled: true
+        throttle_max_tokens: 50
+        throttle_token_ratio: 0.5
+      retryable_codes:
+        - Unavailable
+        - DeadlineExceeded
+        - Internal
+        - DataLoss
+        - ResourceExhausted
