@@ -26,9 +26,16 @@ func (s *TopicConsumer) Subscribe(ctx context.Context, handler MessageHandler) {
 			if ctx.Err() != nil {
 				break
 			}
-			// TODO: Add setup & cleanup
 			err := s.group.Consume(ctx, []string{s.topic}, groupSubscriber{
 				messageHandler: handler,
+				setup: func(session sarama.ConsumerGroupSession) error {
+					slog.Info("session setup", "member", session.MemberID())
+					return nil
+				},
+				cleanup: func(session sarama.ConsumerGroupSession) error {
+					slog.Info("session cleanup", "member", session.MemberID())
+					return nil
+				},
 			})
 			if err != nil {
 				slog.Error(err.Error())

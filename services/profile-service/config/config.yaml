@@ -13,7 +13,7 @@ http_server:
   port: 8082
 
 postgres:
-  host: localhost
+  host: profile-postgres
   port: 5432
   user: postgres
   password: "postgres"

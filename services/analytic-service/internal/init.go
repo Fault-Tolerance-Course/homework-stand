@@ -12,8 +12,12 @@ import (
 	v1 "analytic-service/internal/app/analytic/v1"
 	"analytic-service/internal/applicaton/service"
 	"analytic-service/internal/infrastructure/messagebus"
+	"analytic-service/internal/infrastructure/messagebus/subscriber/scheme/task_events/task_created"
 	"analytic-service/internal/infrastructure/storage"
 	"analytic-service/internal/pkg/connector/postgres"
+
+	eventrouter "analytic-service/internal/pkg/event-router"
+
 	"analytic-service/internal/pkg/grpc/intercept"
 	"analytic-service/internal/pkg/healthcheck"
 	analyticV1 "analytic-service/internal/pkg/pb/analytic-service/analytic/v1"
@@ -61,9 +65,17 @@ func (a *App) initServices(_ context.Context) error {
 	return nil
 }
 
+func (a *App) initHandlers(_ context.Context) error {
+	a.eventRouter = eventrouter.NewEventRouter[string, []byte]()
+
+	a.eventRouter.RegisterAll(task_created.NewMessageHandler(a.services.AcceptTask))
+
+	return nil
+}
+
 func (a *App) initMessageBus(_ context.Context) error {
 	if a.messageBus == nil {
-		a.messageBus = messagebus.NewRegistry(a.services)
+		a.messageBus = messagebus.NewRegistry(a.eventRouter)
 	}
 	return nil
 }

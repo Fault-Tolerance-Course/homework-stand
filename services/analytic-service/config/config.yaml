@@ -14,7 +14,8 @@ http_server:
 
 kafka:
   brokers: [ "kafka:9092" ]
-  consumer_group: worker-service-task-events
+  consumer_group: analytic-group-main
+  retry_consumer_group: analytic-group-retry
 
 postgres:
   host: analytic-postgres

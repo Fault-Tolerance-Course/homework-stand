@@ -1,10 +1,8 @@
-package event
+package task_created
 
 import (
 	"encoding/json"
 	"time"
-
-	"github.com/IBM/sarama"
 )
 
 type TaskCreated struct {
@@ -18,10 +16,9 @@ type TaskCreated struct {
 	CreatedAt     time.Time     `json:"created_at"`
 }
 
-// Deserialize переводит сообщение из одного представления в другое и валидирует
-func Deserialize(message *sarama.ConsumerMessage) (TaskCreated, error) {
+func deserialize(payload []byte) (TaskCreated, error) {
 	var taskCreated TaskCreated
-	err := json.Unmarshal(message.Value, &taskCreated)
+	err := json.Unmarshal(payload, &taskCreated)
 	if err != nil {
 		return TaskCreated{}, err
 	}

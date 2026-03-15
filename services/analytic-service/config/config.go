@@ -11,7 +11,9 @@ import (
 )
 
 const (
-	TaskEventsTopic = "task-events"
+	TaskEventsTopic         = "task-events"
+	TaskEventsRetry30sTopic = "task-events-retry-30s"
+	TaskEventsDLQTopic      = "task-events-dlq"
 )
 
 var (

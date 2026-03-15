@@ -24,8 +24,9 @@ type Postgres struct {
 }
 
 type Kafka struct {
-	Brokers       []string `yaml:"brokers"`
-	ConsumerGroup string   `yaml:"consumer_group"`
+	Brokers            []string `yaml:"brokers"`
+	ConsumerGroup      string   `yaml:"consumer_group"`
+	RetryConsumerGroup string   `yaml:"retry_consumer_group"`
 }
 
 type HttpServer struct {

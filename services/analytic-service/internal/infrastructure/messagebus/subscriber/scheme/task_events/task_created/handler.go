@@ -2,40 +2,52 @@ package task_created
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
 	"analytic-service/internal/applicaton/service/task/accept_task"
-	"analytic-service/internal/infrastructure/messagebus/subscriber/scheme/task_events/task_created/event"
+	"analytic-service/internal/pkg/msgbus/subscriber/retry"
 
-	"github.com/IBM/sarama"
 	"github.com/gofrs/uuid"
 	"github.com/shopspring/decimal"
 )
+
+const eventTypeTaskCreated = "task-created"
 
 type TaskCreator interface {
 	Create(ctx context.Context, request accept_task.CreateTaskRequest) error
 }
 
-type MessageHandler struct {
+type Handler struct {
 	creator TaskCreator
 }
 
-func NewMessageHandler(creator TaskCreator) *MessageHandler {
-	return &MessageHandler{creator: creator}
+func NewMessageHandler(creator TaskCreator) *Handler {
+	return &Handler{creator: creator}
 }
 
-func (h *MessageHandler) Handle(ctx context.Context, _ sarama.ConsumerGroupSession, message *sarama.ConsumerMessage) error {
-	// десереализуем сообщение
-	deserialized, err := event.Deserialize(message)
+// EventType возвращает тип ивента
+func (h *Handler) EventType() string {
+	return eventTypeTaskCreated
+}
+
+func (h *Handler) HandleEvent(ctx context.Context, payload []byte) error {
+	deserialized, err := deserialize(payload)
 	if err != nil {
 		slog.Error(fmt.Sprintf("Ошибка десереализации сообщения: %s", err.Error()))
-		return err
+		// Malformed payload can never be fixed by retrying — go straight to DLQ.
+		return retry.DLQErr(err)
 	}
 
 	amount, err := decimal.NewFromString(deserialized.Price)
 	if err != nil {
-		return err
+		// Invalid price format is a permanent data error — go straight to DLQ.
+		return retry.DLQErr(fmt.Errorf("invalid price %q: %w", deserialized.Price, err))
+	}
+
+	if amount.LessThan(decimal.NewFromInt(90)) {
+		return errors.New("amount is less than 90")
 	}
 
 	return h.creator.Create(ctx, accept_task.NewCreateTaskRequest(

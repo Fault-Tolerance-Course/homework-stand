@@ -3,14 +3,18 @@ package task_created
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"time"
 
 	"task-service/config"
 	"task-service/internal/domain/entity"
+	"task-service/internal/events"
 
 	"task-service/internal/pkg/event"
 
 	"task-service/internal/pkg/pipe"
+
+	"github.com/gofrs/uuid"
 )
 
 type TaskCreatedEvent struct {
@@ -25,26 +29,34 @@ type TaskCreatedEvent struct {
 }
 
 func New(task *entity.Task) pipe.Func[event.Events] {
-	return func(ctx context.Context, events event.Events) (event.Events, error) {
+	return func(ctx context.Context, batch event.Events) (event.Events, error) {
 		// формируем событие
-		body, err := json.Marshal(&TaskCreatedEvent{
-			TaskID:        task.ID.String(),
-			UserID:        task.UserID,
-			CategoryID:    task.CategoryID,
-			Status:        string(task.Status),
-			Comment:       task.Comment,
-			ExecutionTime: task.ExecutionTime,
-			CreatedAt:     task.CreatedAt,
-			Price:         task.Price.String(),
-		})
+		baseEvent := events.Base[TaskCreatedEvent]{
+			EventType: "task-created",
+			EntityID:  strconv.Itoa(int(task.UserID)),
+			Payload: TaskCreatedEvent{
+				TaskID:        task.ID.String(),
+				UserID:        task.UserID,
+				CategoryID:    task.CategoryID,
+				Status:        string(task.Status),
+				Comment:       task.Comment,
+				ExecutionTime: task.ExecutionTime,
+				CreatedAt:     task.CreatedAt,
+				Price:         task.Price.String(),
+			},
+		}
+		// формируем событие
+		body, err := json.Marshal(baseEvent)
 		if err != nil {
 			return nil, err
 		}
 
-		// загорловки в сообщении любые
+		correlationID, _ := uuid.NewV7()
+		// заголовки в сообщении любые
 		headers := map[string]string{
-			"x-app-name":   "task-service",
-			"x-event-type": "task-created",
+			"x-correlation-id": correlationID.String(),
+			"x-app-name":       "task-service",
+			"x-event-type":     "task-created",
 		}
 
 		// это выносится в общие функции
@@ -53,7 +65,7 @@ func New(task *entity.Task) pipe.Func[event.Events] {
 			return nil, err
 		}
 
-		return append(events, event.Event{
+		return append(batch, event.Event{
 			Key:     event.Raw(task.ID.String()),
 			Body:    body,
 			Headers: headersRaw,

@@ -16,6 +16,8 @@ import (
 	"analytic-service/internal/applicaton/service"
 	"analytic-service/internal/infrastructure/storage"
 
+	eventrouter "analytic-service/internal/pkg/event-router"
+
 	"analytic-service/internal/infrastructure/messagebus"
 	"analytic-service/internal/pkg/closer"
 	"analytic-service/internal/pkg/healthcheck"
@@ -46,6 +48,8 @@ type App struct {
 	messageBus *messagebus.Registry
 
 	services *service.Registry
+
+	eventRouter *eventrouter.EventRouter[string, []byte]
 
 	started    int32
 	terminated int32
@@ -129,6 +133,7 @@ func (a *App) init(ctx context.Context) error {
 		a.initPostgres,
 		a.initStorages,
 		a.initServices,
+		a.initHandlers,
 		a.initMainServer,
 		a.initControllers,
 		a.initMessageBus,

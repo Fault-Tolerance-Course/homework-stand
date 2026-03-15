@@ -1,6 +1,10 @@
 package consumer
 
-import "github.com/IBM/sarama"
+import (
+	"log/slog"
+
+	"github.com/IBM/sarama"
+)
 
 type groupSubscriber struct {
 	messageHandler MessageHandler
@@ -41,10 +45,14 @@ func (g groupSubscriber) ConsumeClaim(session sarama.ConsumerGroupSession, claim
 				return ctx.Err()
 			}
 			if err != nil {
+				slog.Error("handle kafka message", "error", err.Error())
 				return err
 			}
 
 			session.MarkMessage(message, "")
+			// Синхронно делаем commit нашего offset'а
+			// Если не вызвать session.Commit() -> будет срабатывать асинхронный коммит раз в интервал
+			session.Commit()
 		case <-ctx.Done():
 			return ctx.Err()
 		}
