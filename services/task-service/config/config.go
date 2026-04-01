@@ -13,7 +13,7 @@ import (
 const (
 	TaskEventsTopic = "task-events"
 
-	AppName = "profile-service"
+	AppName = "task-service"
 
 	ProfileService = "profile-service"
 )

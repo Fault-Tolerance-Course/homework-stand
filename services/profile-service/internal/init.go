@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"profile-service/internal/pkg/ratelimit"
 	"runtime"
 	"sync/atomic"
 
@@ -138,6 +139,7 @@ func (a *App) initMainServer(ctx context.Context) error {
 			grpc.ChainUnaryInterceptor(
 				intercept.ErrorInterceptor(),
 				intercept.ExtractClientNameInterceptor(),
+				ratelimit.NewLimiter(config.Instance().RateLimit).UnaryServerInterceptor(),
 				chaos.ModeInterceptor(a.workloadMode),
 			),
 		),

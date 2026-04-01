@@ -62,3 +62,11 @@ retry:
         - Internal
         - DataLoss
         - ResourceExhausted
+
+rate_limit:
+  rules:
+    - clients: ["task-service"]
+      handlers: ["/profile_service.order.v1.ProfileService/CheckPermission"]
+      limit: 40
+      burst: 45
+      timeout: 50ms
