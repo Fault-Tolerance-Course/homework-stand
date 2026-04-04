@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"profile-service/internal/pkg/ratelimit"
 	"strings"
 	"sync"
+
+	"profile-service/internal/pkg/retry"
 
 	"github.com/ilyakaznacheev/cleanenv"
 )
@@ -25,9 +28,11 @@ type Config struct {
 	GrpcServer GrpcServer `yaml:"grpc_server"`
 	HttpServer HttpServer `yaml:"http_server"`
 
-	Postgres     Postgres     `yaml:"postgres"`
-	RedisCluster RedisCluster `yaml:"redis_cluster"`
-	Cache        Cache        `yaml:"cache"`
+	Postgres     Postgres         `yaml:"postgres"`
+	RedisCluster RedisCluster     `yaml:"redis_cluster"`
+	Cache        Cache            `yaml:"cache"`
+	Retry        retry.Config     `yaml:"retry"`
+	RateLimit    ratelimit.Config `yaml:"rate_limit"`
 
 	Graceful Graceful          `yaml:"graceful"`
 	Targets  map[string]string `yaml:"service"`
